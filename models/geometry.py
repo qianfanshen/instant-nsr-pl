@@ -93,6 +93,9 @@ class BaseImplicitGeometry(BaseModel):
     
         level = chunk_batch(batch_func, self.config.isosurface.chunk, True, self.helper.grid_vertices())
         mesh = self.helper(level, threshold=self.config.isosurface.threshold)
+        print(f"Generated mesh: {mesh}")
+        print(f"Mesh v_pos shape: {mesh['v_pos'].shape}")
+
         mesh['v_pos'] = torch.stack([
             scale_anything(mesh['v_pos'][...,0], (0, 1), (vmin[0], vmax[0])),
             scale_anything(mesh['v_pos'][...,1], (0, 1), (vmin[1], vmax[1])),
@@ -172,6 +175,10 @@ class VolumeSDF(BaseImplicitGeometry):
                     sdf = get_activation(self.config.sdf_activation)(sdf + float(self.config.sdf_bias))
                 if 'feature_activation' in self.config:
                     feature = get_activation(self.config.feature_activation)(feature)
+                    
+                grad = None  
+                laplace = None  
+
                 if with_grad:
                     if self.grad_type == 'analytic':
                         grad = torch.autograd.grad(
@@ -197,7 +204,7 @@ class VolumeSDF(BaseImplicitGeometry):
 
                         if with_laplace:
                             laplace = (points_d_sdf[..., 0::2] + points_d_sdf[..., 1::2] - 2 * sdf[..., None]).sum(-1) / (eps ** 2)
-
+        #import pdb;pdb.set_trace()
         rv = [sdf]
         if with_grad:
             rv.append(grad)

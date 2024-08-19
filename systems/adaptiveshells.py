@@ -14,8 +14,8 @@ from systems.base import BaseSystem
 from systems.criterions import PSNR, binary_cross_entropy
 
 
-@systems.register('neus-system')
-class NeuSSystem(BaseSystem):
+@systems.register('adaptiveshells-system')
+class AdaptiveShellsSystem(BaseSystem):
     """
     Two ways to print to console:
     1. self.print: correctly handle progress bar
@@ -108,6 +108,14 @@ class NeuSSystem(BaseSystem):
         self.log('train/loss_eikonal', loss_eikonal)
         loss += loss_eikonal * self.C(self.config.system.loss.lambda_eikonal)
         
+        loss_inv_s = torch.norm(torch.log(out['inv_s']) - torch.log(out['inv_s_noised']), p=2, dim=-1).mean()
+        self.log('train/loss_inv_s', loss_inv_s)
+        loss += loss_eikonal * self.C(self.config.system.loss.lambda_inv_s)
+        
+        loss_normal = torch.norm(out['normals'] - F.normalize(out['sdf_grad_samples'], p=2, dim=-1), p=2, dim=-1).mean()
+        self.log('train/loss_normal', loss_normal)
+        loss += loss_normal * self.C(self.config.system.loss.lambda_normal)
+        
         opacity = torch.clamp(out['opacity'].squeeze(-1), 1.e-3, 1.-1.e-3)
         loss_mask = binary_cross_entropy(opacity, batch['fg_mask'].float())
         self.log('train/loss_mask', loss_mask)
@@ -145,7 +153,7 @@ class NeuSSystem(BaseSystem):
             loss_ = value * self.C(self.config.system.loss[f"lambda_{name}"])
             loss += loss_
         
-        self.log('train/inv_s', out['inv_s'], prog_bar=True)
+        #self.log('train/inv_s', out['inv_s'], prog_bar=True)
 
         for name, value in self.config.system.loss.items():
             if name.startswith('lambda'):
